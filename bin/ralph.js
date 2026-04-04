@@ -56,12 +56,8 @@ Implement a small vertical slice end-to-end.
 function usage() {
   console.log(`Usage:
   ralph init
-  ralph
-  ralph <max-iterations>
-  ralph build
-  ralph build <max-iterations>
-  ralph plan
-  ralph plan <max-iterations>
+  ralph build [max-iterations] [--dry-run]
+  ralph plan [max-iterations] [--dry-run]
   ralph -h | --help`);
 }
 
@@ -84,6 +80,27 @@ function parseMax(rest) {
   fail("Error: max iterations must be a non-negative integer.");
 }
 
+function parseRunOptions(rest) {
+  let dryRun = false;
+  const positional = [];
+
+  for (const token of rest) {
+    if (token === "--dry-run") {
+      if (dryRun) {
+        fail("Error: --dry-run can only be provided once.");
+      }
+      dryRun = true;
+      continue;
+    }
+    positional.push(token);
+  }
+
+  return {
+    dryRun,
+    maxIterations: parseMax(positional)
+  };
+}
+
 function timestampNow() {
   const now = new Date();
   const y = String(now.getFullYear());
@@ -93,6 +110,35 @@ function timestampNow() {
   const mm = String(now.getMinutes()).padStart(2, "0");
   const ss = String(now.getSeconds()).padStart(2, "0");
   return `${y}${m}${d}_${hh}${mm}${ss}`;
+}
+
+function stripAnsi(text) {
+  return text.replace(/\u001b\[[0-9;]*m/g, "");
+}
+
+function normalizeOutputLine(line) {
+  return stripAnsi(line).trim();
+}
+
+function signalAgentProcessTree(child, signal, useProcessGroup) {
+  if (!child || typeof child.pid !== "number" || child.pid <= 0) {
+    return;
+  }
+
+  if (useProcessGroup) {
+    try {
+      process.kill(-child.pid, signal);
+      return;
+    } catch {
+      // Fall through to direct child signal.
+    }
+  }
+
+  try {
+    child.kill(signal);
+  } catch {
+    // Ignore process already exited / signal errors.
+  }
 }
 
 function ensureFile(filePath, label) {
@@ -134,7 +180,7 @@ function initCommand() {
   console.log("3. Edit .ralph/specs/001-example-spec.md");
   console.log("4. Run: ralph plan 1");
   console.log("5. Review .ralph/IMPLEMENTATION_PLAN.md and edit if needed");
-  console.log("6. Run: ralph");
+  console.log("6. Run: ralph build");
 }
 
 function buildRuntimePrompt(mode, context, modePrompt, modePromptPath) {
@@ -153,12 +199,20 @@ ${modePrompt}
 
 function runAgentIteration({ agentCmd, runtimePrompt, workdir, logFile, env }) {
   return new Promise((resolve, reject) => {
+    const startedAt = Date.now();
+    const useProcessGroup = process.platform !== "win32";
+
     const child = spawn(agentCmd, {
       cwd: workdir,
       env,
       shell: true,
-      stdio: ["pipe", "pipe", "pipe"]
+      stdio: ["pipe", "pipe", "pipe"],
+      detached: useProcessGroup
     });
+    const onParentExit = () => {
+      signalAgentProcessTree(child, "SIGTERM", useProcessGroup);
+    };
+    process.once("exit", onParentExit);
 
     const logStream = fs.createWriteStream(logFile, { flags: "w" });
     let lastNonEmptyLine = "";
@@ -173,8 +227,9 @@ function runAgentIteration({ agentCmd, runtimePrompt, workdir, logFile, env }) {
       const lines = carry.split("\n");
       carry = lines.pop() || "";
       for (const line of lines) {
-        if (line.trim() !== "") {
-          lastNonEmptyLine = line.trimEnd();
+        const normalizedLine = normalizeOutputLine(line);
+        if (normalizedLine !== "") {
+          lastNonEmptyLine = normalizedLine;
         }
       }
     }
@@ -183,18 +238,27 @@ function runAgentIteration({ agentCmd, runtimePrompt, workdir, logFile, env }) {
     child.stderr.on("data", ingest);
 
     child.on("error", (err) => {
+      process.removeListener("exit", onParentExit);
       logStream.end(() => reject(err));
     });
 
     child.on("close", (code, signal) => {
-      if (carry.trim() !== "") {
-        lastNonEmptyLine = carry.trimEnd();
+      process.removeListener("exit", onParentExit);
+
+      const normalizedCarry = normalizeOutputLine(carry);
+      if (normalizedCarry !== "") {
+        lastNonEmptyLine = normalizedCarry;
       }
+
+      // Best-effort cleanup for agent descendants that survive shell exit.
+      signalAgentProcessTree(child, "SIGTERM", useProcessGroup);
+
       logStream.end(() => {
         resolve({
           code: code === null ? 1 : code,
           signal,
-          lastNonEmptyLine
+          lastNonEmptyLine,
+          durationMs: Date.now() - startedAt
         });
       });
     });
@@ -207,7 +271,8 @@ function runAgentIteration({ agentCmd, runtimePrompt, workdir, logFile, env }) {
   });
 }
 
-async function runLoop(mode, maxIterations) {
+async function runLoop(mode, maxIterations, options = {}) {
+  const dryRun = Boolean(options.dryRun);
   const cwd = process.cwd();
   const workdir = cwd;
   const configDir = path.join(workdir, ".ralph");
@@ -251,6 +316,15 @@ async function runLoop(mode, maxIterations) {
   } else {
     console.log("Max iterations: unlimited");
   }
+  console.log(`Dry run: ${dryRun ? "enabled" : "disabled"}`);
+
+  if (dryRun) {
+    console.log("Dry run summary:");
+    console.log(`Agent command: ${agentCmd}`);
+    console.log(`Completion promise: ${completionPromise}`);
+    console.log("No agent iterations were executed.");
+    return;
+  }
 
   const childEnv = {
     ...process.env,
@@ -269,6 +343,10 @@ async function runLoop(mode, maxIterations) {
     iteration += 1;
     const ts = timestampNow();
     const logFile = path.join(logDir, `ralph_${mode}_iter_${iteration}_${ts}.log`);
+    const maxLabel = maxIterations > 0 ? `/${maxIterations}` : "";
+    console.log(`\n=== Iteration ${iteration}${maxLabel} (${mode}) ===`);
+    console.log(`Log file: ${logFile}`);
+
     const result = await runAgentIteration({
       agentCmd,
       runtimePrompt,
@@ -276,6 +354,8 @@ async function runLoop(mode, maxIterations) {
       logFile,
       env: childEnv
     });
+    const durationSeconds = (result.durationMs / 1000).toFixed(1);
+    console.log(`\nIteration ${iteration} completed in ${durationSeconds}s.`);
 
     if (result.code !== 0) {
       if (result.signal) {
@@ -295,7 +375,7 @@ async function main() {
   const args = process.argv.slice(2);
 
   if (args.length === 0) {
-    await runLoop("build", 0);
+    usage();
     return;
   }
 
@@ -314,17 +394,14 @@ async function main() {
   }
 
   if (args[0] === "plan") {
-    await runLoop("plan", parseMax(args.slice(1)));
+    const options = parseRunOptions(args.slice(1));
+    await runLoop("plan", options.maxIterations, options);
     return;
   }
 
   if (args[0] === "build") {
-    await runLoop("build", parseMax(args.slice(1)));
-    return;
-  }
-
-  if (args.length === 1 && isUint(args[0])) {
-    await runLoop("build", Number(args[0]));
+    const options = parseRunOptions(args.slice(1));
+    await runLoop("build", options.maxIterations, options);
     return;
   }
 

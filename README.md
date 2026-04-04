@@ -47,14 +47,21 @@ ralph plan
 ```bash
 ralph build
 ```
+6. Preview what would run without invoking the agent:
+```bash
+ralph build --dry-run
+ralph plan --dry-run
+```
 
 ## Commands
 
 Run these from your project root
 
 - `ralph init`: create `.ralph` starter files in the current directory.
+- `ralph`: print usage.
 - `ralph build [max-iterations]`: build mode.
 - `ralph plan [max-iterations]`: planning mode.
+- `ralph [build|plan] [max-iterations] --dry-run`: print resolved runtime context and exit without running iterations.
 
 ## Environment Variables
 
@@ -65,8 +72,34 @@ Default `.ralph/env.sh` sets:
 
 - `RALPH_AGENT_CMD` to Claude print mode with `--permission-mode bypassPermissions` and `--add-dir "$PWD/.ralph"`.
 
-## Notes
+## Operators Manual
 
-- The loop stops early only when the final non-empty output line exactly matches the completion promise.
-- Build and planning prompts are canonical markdown templates in this repo under `prompts/`, scaffolded into `.ralph/prompts/`, and optional to edit.
+### Build Iteration Semantics
+
+One build iteration is one full invocation of `RALPH_AGENT_CMD`.
+
+For each iteration, `ralph` does this:
+
+1. Builds the runtime prompt and sends it to the agent on stdin.
+2. Streams agent output to console and iteration log file.
+3. Waits for the agent command to exit.
+4. Starts the next iteration unless a stop condition is met.
+
+Stop conditions are:
+
+1. Agent exits non-zero.
+2. Max iterations is reached when using `ralph build <n>`.
+3. The final non-empty output line exactly matches `RALPH_COMPLETION_PROMISE`.
+
+### Task Selection And Completion
+
+Build mode is agent-driven by prompt instructions. The prompt tells the agent to do one highest-priority unchecked plan task per iteration, but the CLI does not enforce plan-step counting itself.
+
+The completion promise must represent full completion, not single-task completion. In build mode that means no unchecked `[ ]` tasks remain in the plan, spec acceptance criteria are satisfied, and verification commands are passing.
+
+
+### Notes
+
 - Planning and build logs are written to `ralph_<mode>_iter_<n>_<timestamp>.log`.
+- On process exit, the CLI does best-effort cleanup of the running agent process tree to avoid lingering child processes.
+- `--dry-run` validates setup and prints mode/config context, but does not execute any agent iterations.
