@@ -5,7 +5,7 @@
   "bin": {
     "ralph": "bin/ralph.js"
   },
-  "type": "commonjs",
+  "type": "module",
   "engines": {
     "node": ">=22"
   },

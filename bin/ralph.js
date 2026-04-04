@@ -1,80 +1,39 @@
 #!/usr/bin/env node
-"use strict";
 
-const fs = require("fs");
-const path = require("path");
-const { spawn } = require("child_process");
-const {
+import fs from "node:fs";
+import path from "node:path";
+import { spawn } from "node:child_process";
+import {
   loadModePrompt,
   projectPromptPath,
-  scaffoldProjectPrompts
-} = require("../lib/prompts");
-
-const DEFAULT_COMPLETION_PROMISE = "<promise>DONE</promise>";
-
-const DEFAULT_ENV_SH = `#!/usr/bin/env bash
-# Source this file before running ralph commands.
-
-# Claude default: add project .ralph dir access and bypass interactive permission prompts.
-export RALPH_AGENT_CMD='claude -p --permission-mode bypassPermissions --add-dir "$PWD/.ralph"'
-
-# Optional override:
-# export RALPH_COMPLETION_PROMISE='${DEFAULT_COMPLETION_PROMISE}'
-`;
-
-const DEFAULT_PLAN = `# Implementation Plan
-
-## Prioritized Tasks
-
-- [ ] (Planning mode) Derive prioritized implementation tasks from \`specs/*.md\`.
-
-## Notes
-
-- Keep tasks small and testable.
-- Add follow-up tasks directly below related items.
-`;
-
-const DEFAULT_FIRST_SPEC = `# Spec: Example Feature
-
-## Goal
-
-Implement a small vertical slice end-to-end.
-
-## Requirements
-
-- Add \`GET /health\` returning \`{ "ok": true }\`.
-- Add automated test coverage.
-- Update docs with a usage example.
-
-## Acceptance Criteria
-
-- The test command passes with endpoint coverage.
-- Lint and type checks pass.
-- Docs mention the endpoint and include a sample response.
-`;
+  scaffoldProjectPrompts,
+  buildRuntimePrompt
+} from "../lib/prompts.js";
+import {
+  DEFAULT_COMPLETION_PROMISE,
+  DEFAULT_ENV_SH,
+  DEFAULT_FIRST_SPEC,
+  DEFAULT_PLAN,
+  HELP_TEXT
+} from "../lib/constants.js";
+import {
+  ensureDirectory,
+  ensureFile,
+  fail,
+  normalizeOutputLine,
+  signalProcessTree,
+  timestampNow
+} from "../lib/utils.js";
 
 function usage() {
-  console.log(`Usage:
-  ralph init
-  ralph build [max-iterations] [--dry-run]
-  ralph plan [max-iterations] [--dry-run]
-  ralph -h | --help`);
+  console.log(HELP_TEXT);
 }
 
-function fail(message) {
-  console.error(message);
-  process.exit(1);
-}
-
-function isUint(value) {
-  return /^[0-9]+$/.test(value);
-}
-
-function parseMax(rest) {
+function parseMaxIterations(rest) {
   if (rest.length === 0) {
     return 0;
   }
-  if (rest.length === 1 && isUint(rest[0])) {
+  if (rest.length === 1 && /^[0-9]+$/.test(rest[0])) {
     return Number(rest[0]);
   }
   fail("Error: max iterations must be a non-negative integer.");
@@ -97,61 +56,10 @@ function parseRunOptions(rest) {
 
   return {
     dryRun,
-    maxIterations: parseMax(positional)
+    maxIterations: parseMaxIterations(positional)
   };
 }
 
-function timestampNow() {
-  const now = new Date();
-  const y = String(now.getFullYear());
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const d = String(now.getDate()).padStart(2, "0");
-  const hh = String(now.getHours()).padStart(2, "0");
-  const mm = String(now.getMinutes()).padStart(2, "0");
-  const ss = String(now.getSeconds()).padStart(2, "0");
-  return `${y}${m}${d}_${hh}${mm}${ss}`;
-}
-
-function stripAnsi(text) {
-  return text.replace(/\u001b\[[0-9;]*m/g, "");
-}
-
-function normalizeOutputLine(line) {
-  return stripAnsi(line).trim();
-}
-
-function signalAgentProcessTree(child, signal, useProcessGroup) {
-  if (!child || typeof child.pid !== "number" || child.pid <= 0) {
-    return;
-  }
-
-  if (useProcessGroup) {
-    try {
-      process.kill(-child.pid, signal);
-      return;
-    } catch {
-      // Fall through to direct child signal.
-    }
-  }
-
-  try {
-    child.kill(signal);
-  } catch {
-    // Ignore process already exited / signal errors.
-  }
-}
-
-function ensureFile(filePath, label) {
-  if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
-    fail(`Setup error: ${label} not found: ${filePath}`);
-  }
-}
-
-function ensureDirectory(dirPath, label) {
-  if (!fs.existsSync(dirPath) || !fs.statSync(dirPath).isDirectory()) {
-    fail(`Setup error: ${label} does not exist: ${dirPath}`);
-  }
-}
 
 function initCommand() {
   const targetRoot = process.cwd();
@@ -183,20 +91,6 @@ function initCommand() {
   console.log("6. Run: ralph build");
 }
 
-function buildRuntimePrompt(mode, context, modePrompt, modePromptPath) {
-  return `Ralph runtime context:
-- Mode: ${mode}
-- Work dir: ${context.workdir}
-- Specs path: ${context.specsGlob}
-- Plan path: ${context.planFile}
-- Plan update path: ${context.planFile}
-- Prompt file: ${modePromptPath}
-- Completion rule: final non-empty output line must exactly match ${context.completionPromise}
-
-${modePrompt}
-`;
-}
-
 function runAgentIteration({ agentCmd, runtimePrompt, workdir, logFile, env }) {
   return new Promise((resolve, reject) => {
     const startedAt = Date.now();
@@ -210,7 +104,7 @@ function runAgentIteration({ agentCmd, runtimePrompt, workdir, logFile, env }) {
       detached: useProcessGroup
     });
     const onParentExit = () => {
-      signalAgentProcessTree(child, "SIGTERM", useProcessGroup);
+      signalProcessTree(child, "SIGTERM", useProcessGroup);
     };
     process.once("exit", onParentExit);
 
@@ -251,7 +145,7 @@ function runAgentIteration({ agentCmd, runtimePrompt, workdir, logFile, env }) {
       }
 
       // Best-effort cleanup for agent descendants that survive shell exit.
-      signalAgentProcessTree(child, "SIGTERM", useProcessGroup);
+      signalProcessTree(child, "SIGTERM", useProcessGroup);
 
       logStream.end(() => {
         resolve({
