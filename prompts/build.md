@@ -37,4 +37,5 @@ pytest -q
 1. Implement only one task in this iteration.
 2. Make one commit with a clear message for this iteration.
 3. If blocked, document the blocker in the plan and stop.
-4. Print `{{COMPLETION_PROMISE}}` as the final non-empty line only when all tasks and acceptance criteria are complete.
+4. After finishing one task, stop this iteration without printing `{{COMPLETION_PROMISE}}` unless the full job is complete.
+5. Print `{{COMPLETION_PROMISE}}` as the final non-empty line only when there are no remaining unchecked `[ ]` tasks in `{{PLAN_FILE}}`, spec requirements and acceptance criteria are fully satisfied, and required verification/check commands are passing.
