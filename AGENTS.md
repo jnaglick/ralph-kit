@@ -9,8 +9,9 @@ This file defines how an agent should work when modifying this repository (`ralp
 Core product behavior:
 
 - `ralph init` creates a `.ralph/` directory in the current project directory.
-- `ralph plan [max-iterations]` runs planning-mode loop iterations.
-- `ralph build [max-iterations]` and `ralph [max-iterations]` run build-mode loop iterations.
+- `ralph plan [max-iterations] [--dry-run]` runs planning-mode loop iterations.
+- `ralph build [max-iterations] [--dry-run]` runs build-mode loop iterations.
+- `ralph` with no arguments prints usage (no implicit build mode).
 
 Design intent:
 
@@ -22,13 +23,16 @@ Design intent:
 ## Environment Baseline
 
 - Node runtime: use Node 22 via `nvm` when developing locally.
-- Package type: CommonJS.
+- Package type: ESM (`"type": "module"`).
 - Global binary entrypoint: `bin/ralph.js`.
 
 ## Source Layout
 
 - `bin/ralph.js`: CLI argument parsing, init scaffolding, loop orchestration, process execution, logging.
-- `lib/prompts.js`: embedded build/plan prompt templates.
+- `lib/prompts.js`: prompt template loading + project prompt scaffolding.
+- `lib/constants.js`: CLI text/scaffold constants.
+- `lib/utils.js`: shared runtime helpers (setup validation, text normalization, timestamping, process cleanup).
+- `prompts/build.md` and `prompts/plan.md`: canonical prompt templates scaffolded into project `.ralph/prompts/`.
 - `README.md`: user-facing install + usage docs.
 - `package.json`: package metadata, bin mapping, publish file list.
 - `.gitignore`: ignore logs and generated runtime output.
@@ -65,6 +69,14 @@ Design intent:
 - `ralph init` scaffolds them to `.ralph/prompts/build.md` and `.ralph/prompts/plan.md`.
 - Runtime loads prompts from `.ralph/prompts/*.md`, so users can customize prompts per project.
 
+8. CLI entry behavior:
+- `ralph` with no subcommand prints usage and exits.
+- Loop execution requires explicit `build` or `plan` subcommands.
+
+9. Dry run behavior:
+- `--dry-run` is supported on `build` and `plan`.
+- Dry run prints resolved runtime context and exits without executing agent iterations.
+
 ## Code Change Guidelines
 
 ### Keep behavior explicit
@@ -75,7 +87,7 @@ Design intent:
 
 ### Keep prompts deterministic
 
-- If you edit `lib/prompts.js`, keep:
+- If you edit prompt-loading behavior or canonical prompt templates, keep:
   - single-task iteration behavior in build mode,
   - plan-only behavior in planning mode,
   - checkbox format guidance (`[ ]`, `[x]`),
@@ -100,11 +112,14 @@ nvm use 22
 ```bash
 node --check bin/ralph.js
 node --check lib/prompts.js
+node --check lib/constants.js
+node --check lib/utils.js
 ```
 
 2. CLI help:
 
 ```bash
+node bin/ralph.js
 node bin/ralph.js --help
 ```
 
@@ -138,7 +153,18 @@ Expected:
 - detects completion in iteration 1,
 - writes a log under `.ralph/logs`.
 
-5. Packability check:
+5. Dry-run smoke test:
+
+```bash
+node /absolute/path/to/ralph/bin/ralph.js build --dry-run
+```
+
+Expected:
+- prints runtime context,
+- does not execute any iteration,
+- does not require prompt completion output.
+
+6. Packability check:
 
 ```bash
 npm pack --dry-run
@@ -147,7 +173,9 @@ npm pack --dry-run
 Confirm expected tarball contents:
 - `package.json`
 - `bin/ralph.js`
+- `lib/constants.js`
 - `lib/prompts.js`
+- `lib/utils.js`
 - `README.md`
 
 ## Documentation Requirements
@@ -156,6 +184,7 @@ When behavior changes, update `README.md` in the same change set.
 
 At minimum, docs must stay accurate for:
 - command usage,
+- explicit subcommand requirement (`build`/`plan`) and dry-run behavior,
 - required env vars,
 - fixed `.ralph` path model,
 - completion semantics.
@@ -171,7 +200,10 @@ At minimum, docs must stay accurate for:
 3. Empty or malformed max-iteration args:
 - CLI should print usage/error and exit non-zero.
 
-4. Existing non-empty `.ralph` on `init`:
+4. Running `ralph` without a subcommand:
+- CLI should print usage and exit without starting iterations.
+
+5. Existing non-empty `.ralph` on `init`:
 - CLI should refuse overwrite.
 
 ## Release Notes Checklist
