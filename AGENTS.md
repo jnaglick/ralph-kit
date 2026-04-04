@@ -56,11 +56,14 @@ Design intent:
 6. `.ralph` scaffold contents:
 - `.ralph/env.sh`
 - `.ralph/IMPLEMENTATION_PLAN.md`
+- `.ralph/prompts/build.md`
+- `.ralph/prompts/plan.md`
 - `.ralph/specs/001-example-spec.md`
 
-7. Internal prompts:
-- `AGENTS.md`, `PROMPT_build.md`, `PROMPT_plan.md` are not scaffolded into `.ralph`.
-- Prompt behavior is embedded in `lib/prompts.js`.
+7. Prompt templates:
+- Canonical prompt templates live in-repo under `prompts/build.md` and `prompts/plan.md`.
+- `ralph init` scaffolds them to `.ralph/prompts/build.md` and `.ralph/prompts/plan.md`.
+- Runtime loads prompts from `.ralph/prompts/*.md`, so users can customize prompts per project.
 
 ## Code Change Guidelines
 
@@ -118,6 +121,8 @@ find .ralph -maxdepth 3 -type f | sort
 Expected files:
 - `.ralph/env.sh`
 - `.ralph/IMPLEMENTATION_PLAN.md`
+- `.ralph/prompts/build.md`
+- `.ralph/prompts/plan.md`
 - `.ralph/specs/001-example-spec.md`
 
 4. Loop smoke test with dummy completion agent:

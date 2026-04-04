@@ -4,9 +4,54 @@
 const fs = require("fs");
 const path = require("path");
 const { spawn } = require("child_process");
-const { buildPrompt, planPrompt } = require("../lib/prompts");
+const {
+  loadModePrompt,
+  projectPromptPath,
+  scaffoldProjectPrompts
+} = require("../lib/prompts");
 
 const DEFAULT_COMPLETION_PROMISE = "<promise>DONE</promise>";
+
+const DEFAULT_ENV_SH = `#!/usr/bin/env bash
+# Source this file before running ralph commands.
+
+# Claude default: add project .ralph dir access and bypass interactive permission prompts.
+export RALPH_AGENT_CMD='claude -p --permission-mode bypassPermissions --add-dir "$PWD/.ralph"'
+
+# Optional override:
+# export RALPH_COMPLETION_PROMISE='${DEFAULT_COMPLETION_PROMISE}'
+`;
+
+const DEFAULT_PLAN = `# Implementation Plan
+
+## Prioritized Tasks
+
+- [ ] (Planning mode) Derive prioritized implementation tasks from \`specs/*.md\`.
+
+## Notes
+
+- Keep tasks small and testable.
+- Add follow-up tasks directly below related items.
+`;
+
+const DEFAULT_FIRST_SPEC = `# Spec: Example Feature
+
+## Goal
+
+Implement a small vertical slice end-to-end.
+
+## Requirements
+
+- Add \`GET /health\` returning \`{ "ok": true }\`.
+- Add automated test coverage.
+- Update docs with a usage example.
+
+## Acceptance Criteria
+
+- The test command passes with endpoint coverage.
+- Lint and type checks pass.
+- Docs mention the endpoint and include a sample response.
+`;
 
 function usage() {
   console.log(`Usage:
@@ -75,70 +120,31 @@ function initCommand() {
   }
 
   fs.mkdirSync(path.join(configDir, "specs"), { recursive: true });
+  scaffoldProjectPrompts(configDir);
 
-  const envSh = `#!/usr/bin/env bash
-# Source this file before running ralph commands.
-
-# Claude default: add project .ralph dir access and bypass interactive permission prompts.
-export RALPH_AGENT_CMD='claude -p --permission-mode bypassPermissions --add-dir "$PWD/.ralph"'
-
-# Optional override:
-# export RALPH_COMPLETION_PROMISE='${DEFAULT_COMPLETION_PROMISE}'
-`;
-
-  const plan = `# Implementation Plan
-
-## Prioritized Tasks
-
-- [ ] (Planning mode) Derive prioritized implementation tasks from \`specs/*.md\`.
-
-## Notes
-
-- Keep tasks small and testable.
-- Add follow-up tasks directly below related items.
-`;
-
-  const spec = `# Spec: Example Feature
-
-## Goal
-
-Implement a small vertical slice end-to-end.
-
-## Requirements
-
-- Add \`GET /health\` returning \`{ "ok": true }\`.
-- Add automated test coverage.
-- Update docs with a usage example.
-
-## Acceptance Criteria
-
-- The test command passes with endpoint coverage.
-- Lint and type checks pass.
-- Docs mention the endpoint and include a sample response.
-`;
-
-  fs.writeFileSync(path.join(configDir, "env.sh"), envSh, "utf8");
+  fs.writeFileSync(path.join(configDir, "env.sh"), DEFAULT_ENV_SH, "utf8");
   fs.chmodSync(path.join(configDir, "env.sh"), 0o755);
-  fs.writeFileSync(path.join(configDir, "IMPLEMENTATION_PLAN.md"), plan, "utf8");
-  fs.writeFileSync(path.join(configDir, "specs", "001-example-spec.md"), spec, "utf8");
+  fs.writeFileSync(path.join(configDir, "IMPLEMENTATION_PLAN.md"), DEFAULT_PLAN, "utf8");
+  fs.writeFileSync(path.join(configDir, "specs", "001-example-spec.md"), DEFAULT_FIRST_SPEC, "utf8");
 
   console.log(`Initialized ${configDir}`);
   console.log("Next steps:");
-  console.log("1. source ./.ralph/env.sh");
-  console.log("2. Edit ./.ralph/specs/001-example-spec.md");
-  console.log("3. Run: ralph plan 1");
-  console.log("4. Review ./.ralph/IMPLEMENTATION_PLAN.md and edit if needed");
-  console.log("5. Run: ralph");
+  console.log("1. source .ralph/env.sh");
+  console.log("2. Optionally edit .ralph/prompts/build.md and .ralph/prompts/plan.md");
+  console.log("3. Edit .ralph/specs/001-example-spec.md");
+  console.log("4. Run: ralph plan 1");
+  console.log("5. Review .ralph/IMPLEMENTATION_PLAN.md and edit if needed");
+  console.log("6. Run: ralph");
 }
 
-function buildRuntimePrompt(mode, context) {
-  const modePrompt = mode === "build" ? buildPrompt(context) : planPrompt(context);
+function buildRuntimePrompt(mode, context, modePrompt, modePromptPath) {
   return `Ralph runtime context:
 - Mode: ${mode}
 - Work dir: ${context.workdir}
 - Specs path: ${context.specsGlob}
 - Plan path: ${context.planFile}
 - Plan update path: ${context.planFile}
+- Prompt file: ${modePromptPath}
 - Completion rule: final non-empty output line must exactly match ${context.completionPromise}
 
 ${modePrompt}
@@ -220,6 +226,7 @@ async function runLoop(mode, maxIterations) {
   const planFile = path.join(configDir, "IMPLEMENTATION_PLAN.md");
   ensureDirectory(specsDir, "Specs directory");
   ensureFile(planFile, "Implementation plan");
+  scaffoldProjectPrompts(configDir);
 
   const logDir = path.join(configDir, "logs");
   fs.mkdirSync(logDir, { recursive: true });
@@ -230,12 +237,15 @@ async function runLoop(mode, maxIterations) {
     planFile,
     completionPromise
   };
-  const runtimePrompt = buildRuntimePrompt(mode, context);
+  const modePromptPath = projectPromptPath(configDir, mode);
+  const modePrompt = loadModePrompt(configDir, mode, context);
+  const runtimePrompt = buildRuntimePrompt(mode, context, modePrompt, modePromptPath);
 
   console.log(`Mode: ${mode}`);
   console.log(`Config dir: ${configDir}`);
   console.log(`Work dir: ${workdir}`);
   console.log(`Log dir: ${logDir}`);
+  console.log(`Prompt file: ${modePromptPath}`);
   if (maxIterations > 0) {
     console.log(`Max iterations: ${maxIterations}`);
   } else {

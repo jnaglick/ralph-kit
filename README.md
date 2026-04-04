@@ -24,6 +24,9 @@ This creates:
 .ralph/
   env.sh
   IMPLEMENTATION_PLAN.md
+  prompts/
+    build.md
+    plan.md
   specs/
     001-example-spec.md
 ```
@@ -35,11 +38,12 @@ This creates:
 source .ralph/env.sh
 ```
 2. Edit `.ralph/specs/*.md`.
-3. Generate or refresh the plan:
+3. Optionally edit `.ralph/prompts/build.md` and `.ralph/prompts/plan.md` to customize agent behavior.
+4. Generate or refresh the plan:
 ```bash
 ralph plan
 ```
-4. Execute build iterations:
+5. Execute build iterations:
 ```bash
 ralph build
 ```
@@ -64,4 +68,5 @@ Default `.ralph/env.sh` sets:
 ## Notes
 
 - The loop stops early only when the final non-empty output line exactly matches the completion promise.
+- Build and planning prompts are canonical markdown templates in this repo under `prompts/`, scaffolded into `.ralph/prompts/`, and optional to edit.
 - Planning and build logs are written to `ralph_<mode>_iter_<n>_<timestamp>.log`.

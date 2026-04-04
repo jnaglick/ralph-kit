@@ -7,11 +7,12 @@
   },
   "type": "commonjs",
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "files": [
     "bin",
     "lib",
+    "prompts",
     "README.md"
   ],
   "license": "MIT"
