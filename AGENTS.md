@@ -11,6 +11,7 @@ Core product behavior:
 - `ralph init` creates a `.ralph/` directory in the current project directory.
 - `ralph plan [max-iterations] [--dry-run]` runs planning-mode loop iterations.
 - `ralph build [max-iterations] [--dry-run]` runs build-mode loop iterations.
+- `ralph instruct [max-iterations] [--dry-run]` runs operator-instruction loop iterations.
 - `ralph` with no arguments prints usage (no implicit build mode).
 
 Design intent:
@@ -32,7 +33,7 @@ Design intent:
 - `lib/prompts.js`: prompt template loading + project prompt scaffolding.
 - `lib/constants.js`: CLI text/scaffold constants.
 - `lib/utils.js`: shared runtime helpers (setup validation, text normalization, timestamping, process cleanup).
-- `prompts/build.md` and `prompts/plan.md`: canonical prompt templates scaffolded into project `.ralph/prompts/`.
+- `prompts/build.md`, `prompts/plan.md`, and `prompts/instruct.md`: canonical prompt templates scaffolded into project `.ralph/prompts/`.
 - `README.md`: user-facing install + usage docs.
 - `package.json`: package metadata, bin mapping, publish file list.
 - `.gitignore`: ignore logs and generated runtime output.
@@ -60,21 +61,23 @@ Design intent:
 6. `.ralph` scaffold contents:
 - `.ralph/env.sh`
 - `.ralph/IMPLEMENTATION_PLAN.md`
+- `.ralph/OPERATOR_INSTRUCT.md`
 - `.ralph/prompts/build.md`
 - `.ralph/prompts/plan.md`
+- `.ralph/prompts/instruct.md`
 - `.ralph/specs/001-example-spec.md`
 
 7. Prompt templates:
-- Canonical prompt templates live in-repo under `prompts/build.md` and `prompts/plan.md`.
-- `ralph init` scaffolds them to `.ralph/prompts/build.md` and `.ralph/prompts/plan.md`.
+- Canonical prompt templates live in-repo under `prompts/build.md`, `prompts/plan.md`, and `prompts/instruct.md`.
+- `ralph init` scaffolds them to `.ralph/prompts/build.md`, `.ralph/prompts/plan.md`, and `.ralph/prompts/instruct.md`.
 - Runtime loads prompts from `.ralph/prompts/*.md`, so users can customize prompts per project.
 
 8. CLI entry behavior:
 - `ralph` with no subcommand prints usage and exits.
-- Loop execution requires explicit `build` or `plan` subcommands.
+- Loop execution requires explicit `build`, `plan`, or `instruct` subcommands.
 
 9. Dry run behavior:
-- `--dry-run` is supported on `build` and `plan`.
+- `--dry-run` is supported on `build`, `plan`, and `instruct`.
 - Dry run prints resolved runtime context and exits without executing agent iterations.
 
 ## Code Change Guidelines
@@ -136,8 +139,10 @@ find .ralph -maxdepth 3 -type f | sort
 Expected files:
 - `.ralph/env.sh`
 - `.ralph/IMPLEMENTATION_PLAN.md`
+- `.ralph/OPERATOR_INSTRUCT.md`
 - `.ralph/prompts/build.md`
 - `.ralph/prompts/plan.md`
+- `.ralph/prompts/instruct.md`
 - `.ralph/specs/001-example-spec.md`
 
 4. Loop smoke test with dummy completion agent:
@@ -157,6 +162,7 @@ Expected:
 
 ```bash
 node /absolute/path/to/ralph/bin/ralph.js build --dry-run
+node /absolute/path/to/ralph/bin/ralph.js instruct --dry-run
 ```
 
 Expected:
@@ -184,7 +190,7 @@ When behavior changes, update `README.md` in the same change set.
 
 At minimum, docs must stay accurate for:
 - command usage,
-- explicit subcommand requirement (`build`/`plan`) and dry-run behavior,
+- explicit subcommand requirement (`build`/`plan`/`instruct`) and dry-run behavior,
 - required env vars,
 - fixed `.ralph` path model,
 - completion semantics.

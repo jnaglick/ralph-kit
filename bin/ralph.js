@@ -13,6 +13,7 @@ import {
   DEFAULT_COMPLETION_PROMISE,
   DEFAULT_ENV_SH,
   DEFAULT_FIRST_SPEC,
+  DEFAULT_OPERATOR_INSTRUCT,
   DEFAULT_PLAN,
   HELP_TEXT
 } from "../lib/constants.js";
@@ -79,15 +80,16 @@ function initCommand() {
   fs.writeFileSync(path.join(configDir, "env.sh"), DEFAULT_ENV_SH, "utf8");
   fs.chmodSync(path.join(configDir, "env.sh"), 0o755);
   fs.writeFileSync(path.join(configDir, "IMPLEMENTATION_PLAN.md"), DEFAULT_PLAN, "utf8");
+  fs.writeFileSync(path.join(configDir, "OPERATOR_INSTRUCT.md"), DEFAULT_OPERATOR_INSTRUCT, "utf8");
   fs.writeFileSync(path.join(configDir, "specs", "001-example-spec.md"), DEFAULT_FIRST_SPEC, "utf8");
 
   console.log(`Initialized ${configDir}`);
   console.log("Next steps:");
   console.log("1. source .ralph/env.sh");
-  console.log("2. Optionally edit .ralph/prompts/build.md and .ralph/prompts/plan.md");
+  console.log("2. Optionally edit .ralph/prompts/build.md, .ralph/prompts/plan.md, and .ralph/prompts/instruct.md");
   console.log("3. Edit .ralph/specs/001-example-spec.md");
-  console.log("4. Run: ralph plan 1");
-  console.log("5. Review .ralph/IMPLEMENTATION_PLAN.md and edit if needed");
+  console.log("4. Run: ralph plan");
+  console.log("5. Review .ralph/IMPLEMENTATION_PLAN.md and .ralph/OPERATOR_INSTRUCT.md");
   console.log("6. Run: ralph build");
 }
 
@@ -183,8 +185,14 @@ async function runLoop(mode, maxIterations, options = {}) {
   const specsDir = path.join(configDir, "specs");
   const specsGlob = path.join(specsDir, "*.md");
   const planFile = path.join(configDir, "IMPLEMENTATION_PLAN.md");
+  const operatorInstructFile = path.join(configDir, "OPERATOR_INSTRUCT.md");
   ensureDirectory(specsDir, "Specs directory");
   ensureFile(planFile, "Implementation plan");
+  if (!fs.existsSync(operatorInstructFile)) {
+    fs.writeFileSync(operatorInstructFile, DEFAULT_OPERATOR_INSTRUCT, "utf8");
+  } else {
+    ensureFile(operatorInstructFile, "Operator instructions");
+  }
   scaffoldProjectPrompts(configDir);
 
   const logDir = path.join(configDir, "logs");
@@ -194,7 +202,9 @@ async function runLoop(mode, maxIterations, options = {}) {
     workdir,
     specsGlob,
     planFile,
-    completionPromise
+    completionPromise,
+    operatorInstructFile,
+    logDir
   };
   const modePromptPath = projectPromptPath(configDir, mode);
   const modePrompt = loadModePrompt(configDir, mode, context);
@@ -205,6 +215,7 @@ async function runLoop(mode, maxIterations, options = {}) {
   console.log(`Work dir: ${workdir}`);
   console.log(`Log dir: ${logDir}`);
   console.log(`Prompt file: ${modePromptPath}`);
+  console.log(`Operator instructions file: ${operatorInstructFile}`);
   if (maxIterations > 0) {
     console.log(`Max iterations: ${maxIterations}`);
   } else {
@@ -296,6 +307,12 @@ async function main() {
   if (args[0] === "build") {
     const options = parseRunOptions(args.slice(1));
     await runLoop("build", options.maxIterations, options);
+    return;
+  }
+
+  if (args[0] === "instruct") {
+    const options = parseRunOptions(args.slice(1));
+    await runLoop("instruct", options.maxIterations, options);
     return;
   }
 

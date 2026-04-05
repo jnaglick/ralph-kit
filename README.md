@@ -24,9 +24,11 @@ This creates:
 .ralph/
   env.sh
   IMPLEMENTATION_PLAN.md
+  OPERATOR_INSTRUCT.md
   prompts/
     build.md
     plan.md
+    instruct.md
   specs/
     001-example-spec.md
 ```
@@ -38,7 +40,7 @@ This creates:
 source .ralph/env.sh
 ```
 2. Edit `.ralph/specs/*.md`.
-3. Optionally edit `.ralph/prompts/build.md` and `.ralph/prompts/plan.md` to customize agent behavior.
+3. Optionally edit `.ralph/prompts/build.md`, `.ralph/prompts/plan.md`, and `.ralph/prompts/instruct.md` to customize agent behavior.
 4. Generate or refresh the plan:
 ```bash
 ralph plan
@@ -47,10 +49,15 @@ ralph plan
 ```bash
 ralph build
 ```
-6. Preview what would run without invoking the agent:
+6. (Optionally) Refresh operator-facing required actions:
+```bash
+ralph instruct
+```
+7. Preview runtime context without invoking the agent:
 ```bash
 ralph build --dry-run
 ralph plan --dry-run
+ralph instruct --dry-run
 ```
 
 ## Commands
@@ -61,7 +68,8 @@ Run these from your project root
 - `ralph`: print usage.
 - `ralph build [max-iterations]`: build mode.
 - `ralph plan [max-iterations]`: planning mode.
-- `ralph [build|plan] [max-iterations] --dry-run`: print resolved runtime context and exit without running iterations.
+- `ralph instruct [max-iterations]`: operator instruction refresh mode.
+- `ralph [build|plan|instruct] [max-iterations] --dry-run`: print resolved runtime context and exit without running iterations.
 
 ## Environment Variables
 
@@ -97,9 +105,20 @@ Build mode is agent-driven by prompt instructions. The prompt tells the agent to
 
 The completion promise must represent full completion, not single-task completion. In build mode that means no unchecked `[ ]` tasks remain in the plan, spec acceptance criteria are satisfied, and verification commands are passing.
 
+### Operator Instruction Semantics
+
+- `ralph instruct` analyzes specs, plan, codebase, and optionally logs to refresh `.ralph/OPERATOR_INSTRUCT.md`.
+- `ralph plan` can reconcile operator-reported completed work from specs and refresh both `.ralph/IMPLEMENTATION_PLAN.md` and `.ralph/OPERATOR_INSTRUCT.md`.
+- `ralph build` also updates `.ralph/OPERATOR_INSTRUCT.md` with any human-required steps discovered during implementation.
+- When operator action is required, the agent should also add plan tasks that start with `**[Operator]**`.
+- The operator should mark those `**[Operator]**` tasks as `[x]` after completing them.
+- The agent should add agent-owned follow-up verification tasks immediately below operator tasks to validate operator work.
+- Operator instructions should include the acceptance criteria/checks that will be run after operator completion.
+- If no operator action is required, `.ralph/OPERATOR_INSTRUCT.md` should explicitly say so.
+
 
 ### Notes
 
-- Planning and build logs are written to `ralph_<mode>_iter_<n>_<timestamp>.log`.
+- Planning, build, and instruct logs are written to `ralph_<mode>_iter_<n>_<timestamp>.log`.
 - On process exit, the CLI does best-effort cleanup of the running agent process tree to avoid lingering child processes.
 - `--dry-run` validates setup and prints mode/config context, but does not execute any agent iterations.

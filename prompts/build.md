@@ -4,6 +4,7 @@
 
 - Specs: `{{SPECS_GLOB}}`
 - Implementation plan: `{{PLAN_FILE}}`
+- Operator instructions file: `{{OPERATOR_INSTRUCT_FILE}}`
 - Target repository: `{{WORKDIR}}`
 
 ## Core Behavior
@@ -31,6 +32,15 @@ pytest -q
 1. Mark completed tasks in `{{PLAN_FILE}}`.
 2. Add follow-up tasks directly below related items.
 3. Keep tasks small and testable.
+
+## Operator Updates
+
+1. Update `{{OPERATOR_INSTRUCT_FILE}}` with any actions the human operator must perform before the next `ralph build`.
+2. Keep instructions concrete and ordered, and include the acceptance criteria/checks that will be run after operator completion.
+3. If operator action is required, add matching task items in `{{PLAN_FILE}}` that start with `**[Operator]**`.
+4. Treat `**[Operator]**` plan items as human-owned steps that the operator will mark `[x]` after completing.
+5. Immediately below each `**[Operator]**` task, add one or more agent-owned follow-up tasks to verify the operator step was done correctly.
+6. If no operator action is required, state that explicitly in `{{OPERATOR_INSTRUCT_FILE}}` and remove stale `**[Operator]**` tasks.
 
 ## Iteration Rules
 
