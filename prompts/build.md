@@ -46,6 +46,10 @@ pytest -q
 
 1. Implement only one task in this iteration.
 2. Make one commit with a clear message for this iteration.
-3. If blocked, document the blocker in the plan and stop.
-4. After finishing one task, stop this iteration without printing `{{COMPLETION_PROMISE}}` unless the full job is complete.
-5. Print `{{COMPLETION_PROMISE}}` as the final non-empty line only when there are no remaining unchecked `[ ]` tasks in `{{PLAN_FILE}}`, spec requirements and acceptance criteria are fully satisfied, and required verification/check commands are passing.
+3. Never attempt to perform `**[Operator]**` tasks yourself.
+4. If blocked, document the blocker in the plan and stop.
+5. After finishing one task, stop this iteration without printing `{{COMPLETION_PROMISE}}` unless one of the completion conditions below is met.
+6. Print `{{COMPLETION_PROMISE}}` as the final non-empty line when either condition is true:
+   - Full completion: there are no remaining unchecked `[ ]` tasks in `{{PLAN_FILE}}`, spec requirements and acceptance criteria are fully satisfied, and required verification/check commands are passing.
+   - Operator handoff completion: the remaining unchecked tasks are only `**[Operator]**` tasks and/or agent verification tasks that are blocked on unchecked `**[Operator]**` tasks, and both `{{OPERATOR_INSTRUCT_FILE}}` and `{{PLAN_FILE}}` are fully updated with concrete operator steps plus acceptance criteria/checks.
+7. In operator handoff completion state, do not continue looping on repeated blocked checks; return control to the human by printing `{{COMPLETION_PROMISE}}`.

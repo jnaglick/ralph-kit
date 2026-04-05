@@ -103,7 +103,9 @@ Stop conditions are:
 
 Build mode is agent-driven by prompt instructions. The prompt tells the agent to do one highest-priority unchecked plan task per iteration, but the CLI does not enforce plan-step counting itself.
 
-The completion promise must represent full completion, not single-task completion. In build mode that means no unchecked `[ ]` tasks remain in the plan, spec acceptance criteria are satisfied, and verification commands are passing.
+The completion promise must not represent single-task completion. In build mode it should be emitted only for:
+- Full completion: no unchecked `[ ]` tasks remain in the plan, spec acceptance criteria are satisfied, and verification commands are passing.
+- Operator handoff completion: remaining unchecked tasks are only operator-owned tasks (plus verification tasks blocked on them), and operator instructions are fully updated.
 
 ### Operator Instruction Semantics
 
@@ -114,6 +116,7 @@ The completion promise must represent full completion, not single-task completio
 - The operator should mark those `**[Operator]**` tasks as `[x]` after completing them.
 - The agent should add agent-owned follow-up verification tasks immediately below operator tasks to validate operator work.
 - Operator instructions should include the acceptance criteria/checks that will be run after operator completion.
+- In build mode, if only operator tasks (and agent verification tasks blocked on them) remain, the agent should print the completion promise to hand control back to the operator instead of looping.
 - If no operator action is required, `.ralph/OPERATOR_INSTRUCT.md` should explicitly say so.
 
 

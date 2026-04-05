@@ -27,6 +27,7 @@ Review the current project state and create or refresh `{{OPERATOR_INSTRUCT_FILE
 4. If operator action is required, add matching task items in `{{PLAN_FILE}}` that start with `**[Operator]**`.
 5. Treat `**[Operator]**` plan items as human-owned steps that the operator will mark `[x]` after completing.
 6. Immediately below each `**[Operator]**` task, add one or more agent-owned follow-up tasks to verify the operator step was done correctly.
-7. Remove stale items that are no longer required from both `{{OPERATOR_INSTRUCT_FILE}}` and `{{PLAN_FILE}}`.
-8. If no human action is required, state that explicitly in `{{OPERATOR_INSTRUCT_FILE}}` and remove stale `**[Operator]**` tasks.
-9. Print `{{COMPLETION_PROMISE}}` as the final non-empty line after `{{OPERATOR_INSTRUCT_FILE}}` and `{{PLAN_FILE}}` are updated.
+7. Structure operator-related plan items so that, while waiting on operator work, remaining tasks are only `**[Operator]**` tasks plus verification tasks blocked on them.
+8. Remove stale items that are no longer required from both `{{OPERATOR_INSTRUCT_FILE}}` and `{{PLAN_FILE}}`.
+9. If no human action is required, state that explicitly in `{{OPERATOR_INSTRUCT_FILE}}` and remove stale `**[Operator]**` tasks.
+10. Print `{{COMPLETION_PROMISE}}` as the final non-empty line after `{{OPERATOR_INSTRUCT_FILE}}` and `{{PLAN_FILE}}` are updated.
