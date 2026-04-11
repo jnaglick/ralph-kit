@@ -93,7 +93,7 @@ function initCommand() {
   console.log("6. Run: ralph build");
 }
 
-function runAgentIteration({ agentCmd, runtimePrompt, workdir, logFile, env }) {
+function runAgentIteration({ agentCmd, runtimePrompt, workdir, logFile, pidFile, env }) {
   return new Promise((resolve, reject) => {
     const startedAt = Date.now();
     const useProcessGroup = process.platform !== "win32";
@@ -109,6 +109,21 @@ function runAgentIteration({ agentCmd, runtimePrompt, workdir, logFile, env }) {
       signalProcessTree(child, "SIGTERM", useProcessGroup);
     };
     process.once("exit", onParentExit);
+
+    if (pidFile) {
+      const pidData = {
+        pid: child.pid,
+        mode: (env && env.RALPH_MODE) || "unknown",
+        startedAt: new Date(startedAt).toISOString(),
+        logFile,
+        note: `kill -TERM -${child.pid} to signal entire process group`
+      };
+      try {
+        fs.writeFileSync(pidFile, JSON.stringify(pidData, null, 2), "utf8");
+      } catch {
+        // best-effort
+      }
+    }
 
     const logStream = fs.createWriteStream(logFile, { flags: "w" });
     let lastNonEmptyLine = "";
@@ -170,6 +185,7 @@ function runAgentIteration({ agentCmd, runtimePrompt, workdir, logFile, env }) {
       process.removeListener("exit", onParentExit);
       if (statusInterval) clearInterval(statusInterval);
       clearStatusLine();
+      if (pidFile) { try { fs.unlinkSync(pidFile); } catch {} }
       logStream.end(() => reject(err));
     });
 
@@ -186,6 +202,7 @@ function runAgentIteration({ agentCmd, runtimePrompt, workdir, logFile, env }) {
       // Best-effort cleanup for agent descendants that survive shell exit.
       signalProcessTree(child, "SIGTERM", useProcessGroup);
 
+      if (pidFile) { try { fs.unlinkSync(pidFile); } catch {} }
       logStream.end(() => {
         resolve({
           code: code === null ? 1 : code,
@@ -285,7 +302,8 @@ async function runLoop(mode, maxIterations, options = {}) {
     ...process.env,
     RALPH_CONFIG_DIR: configDir,
     RALPH_WORKDIR: workdir,
-    RALPH_COMPLETION_PROMISE: completionPromise
+    RALPH_COMPLETION_PROMISE: completionPromise,
+    RALPH_MODE: mode
   };
 
   let iteration = 0;
@@ -306,6 +324,7 @@ async function runLoop(mode, maxIterations, options = {}) {
       runtimePrompt,
       workdir,
       logFile,
+      pidFile: path.join(configDir, "agent.pid"),
       env: childEnv
     });
     const durationSeconds = (result.durationMs / 1000).toFixed(1);
