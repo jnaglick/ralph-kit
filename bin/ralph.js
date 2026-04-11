@@ -113,10 +113,41 @@ function runAgentIteration({ agentCmd, runtimePrompt, workdir, logFile, env }) {
     const logStream = fs.createWriteStream(logFile, { flags: "w" });
     let lastNonEmptyLine = "";
     let carry = "";
+    let messageCount = 0;
+    let lastMessageAt = null;
+
+    const isTTY = process.stdout.isTTY;
+    const spinnerFrames = ["-", "\\", "|", "/"];
+    let spinnerIdx = 0;
+    let statusLineLen = 0;
+    let statusInterval = null;
+
+    function writeStatusLine() {
+      const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
+      const sinceMsg = lastMessageAt === null
+        ? "n/a"
+        : `${((Date.now() - lastMessageAt) / 1000).toFixed(1)}s`;
+      const spinner = spinnerFrames[spinnerIdx % spinnerFrames.length];
+      spinnerIdx++;
+      const line = `${spinner} ${messageCount} messages received | since last: ${sinceMsg} | total elapsed: ${elapsed}s`;
+      const padded = line.padEnd(statusLineLen);
+      statusLineLen = line.length;
+      process.stdout.write(`\r${padded}`);
+    }
+
+    function clearStatusLine() {
+      if (statusLineLen > 0) {
+        process.stdout.write(`\r${" ".repeat(statusLineLen)}\r`);
+        statusLineLen = 0;
+      }
+    }
+
+    if (isTTY) {
+      statusInterval = setInterval(writeStatusLine, 100);
+    }
 
     function ingest(chunk) {
       const text = chunk.toString("utf8");
-      process.stdout.write(text);
       logStream.write(text);
 
       carry += text.replace(/\r/g, "\n");
@@ -126,6 +157,8 @@ function runAgentIteration({ agentCmd, runtimePrompt, workdir, logFile, env }) {
         const normalizedLine = normalizeOutputLine(line);
         if (normalizedLine !== "") {
           lastNonEmptyLine = normalizedLine;
+          messageCount++;
+          lastMessageAt = Date.now();
         }
       }
     }
@@ -135,11 +168,15 @@ function runAgentIteration({ agentCmd, runtimePrompt, workdir, logFile, env }) {
 
     child.on("error", (err) => {
       process.removeListener("exit", onParentExit);
+      if (statusInterval) clearInterval(statusInterval);
+      clearStatusLine();
       logStream.end(() => reject(err));
     });
 
     child.on("close", (code, signal) => {
       process.removeListener("exit", onParentExit);
+      if (statusInterval) clearInterval(statusInterval);
+      clearStatusLine();
 
       const normalizedCarry = normalizeOutputLine(carry);
       if (normalizedCarry !== "") {
