@@ -111,15 +111,14 @@ function runAgentIteration({ agentCmd, runtimePrompt, workdir, logFile, pidFile,
     process.once("exit", onParentExit);
 
     if (pidFile) {
-      const pidData = {
-        pid: child.pid,
-        mode: (env && env.RALPH_MODE) || "unknown",
-        startedAt: new Date(startedAt).toISOString(),
-        logFile,
-        note: `kill -TERM -${child.pid} to signal entire process group`
-      };
       try {
-        fs.writeFileSync(pidFile, JSON.stringify(pidData, null, 2), "utf8");
+        fs.writeFileSync(pidFile, JSON.stringify({
+          pid: child.pid,
+          mode: (env && env.RALPH_MODE) || "unknown",
+          startedAt: new Date(startedAt).toISOString(),
+          logFile,
+          killCmd: `kill -TERM -${child.pid}`,
+        }, null, 2), "utf8");
       } catch {
         // best-effort
       }
@@ -132,7 +131,7 @@ function runAgentIteration({ agentCmd, runtimePrompt, workdir, logFile, pidFile,
     let lastMessageAt = null;
 
     const isTTY = process.stdout.isTTY;
-    const spinnerFrames = ["-", "\\", "|", "/"];
+    const spinnerFrames = ["⠋","⠙","⠹","⠸","⠼","⠴","⠦","⠧","⠇","⠏"];
     let spinnerIdx = 0;
     let statusLineLen = 0;
     let statusInterval = null;
@@ -202,7 +201,7 @@ function runAgentIteration({ agentCmd, runtimePrompt, workdir, logFile, pidFile,
       // Best-effort cleanup for agent descendants that survive shell exit.
       signalProcessTree(child, "SIGTERM", useProcessGroup);
 
-      if (pidFile) { try { fs.unlinkSync(pidFile); } catch {} }
+      if (pidFile) { try { fs.unlinkSync(pidFile); } catch { /* already gone */ } }
       logStream.end(() => {
         resolve({
           code: code === null ? 1 : code,
@@ -225,7 +224,7 @@ function lineMatchesCompletionPromise(line, completionPromise) {
   if (line === completionPromise) return true;
   try {
     const parsed = JSON.parse(line);
-    if (typeof parsed.result === "string" && parsed.result.trimEnd() === completionPromise) {
+    if (typeof parsed.result === "string" && parsed.result.trimEnd().endsWith(completionPromise)) {
       return true;
     }
   } catch {
@@ -338,7 +337,7 @@ async function runLoop(mode, maxIterations, options = {}) {
     }
 
     if (lineMatchesCompletionPromise(result.lastNonEmptyLine, completionPromise)) {
-      console.log(`\n💥 Detected completion promise in iteration ${iteration}.`);
+      console.log(`\n✅ Detected completion promise in iteration ${iteration}.`);
       break;
     }
   }
