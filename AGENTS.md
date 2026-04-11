@@ -11,7 +11,7 @@ Core product behavior:
 - `ralph init` creates a `.ralph/` directory in the current project directory.
 - `ralph plan [max-iterations] [--dry-run]` runs planning-mode loop iterations.
 - `ralph build [max-iterations] [--dry-run]` runs build-mode loop iterations.
-- `ralph instruct [max-iterations] [--dry-run]` runs operator-instruction loop iterations.
+- `ralph sync [max-iterations] [--dry-run]` reconciles the plan and operator instructions with actual project state.
 - `ralph` with no arguments prints usage (no implicit build mode).
 
 Design intent:
@@ -33,7 +33,7 @@ Design intent:
 - `lib/prompts.js`: prompt template loading + project prompt scaffolding.
 - `lib/constants.js`: CLI text/scaffold constants.
 - `lib/utils.js`: shared runtime helpers (setup validation, text normalization, timestamping, process cleanup).
-- `prompts/build.md`, `prompts/plan.md`, and `prompts/instruct.md`: canonical prompt templates scaffolded into project `.ralph/prompts/`.
+- `prompts/build.md`, `prompts/plan.md`, and `prompts/sync.md`: canonical prompt templates scaffolded into project `.ralph/prompts/`.
 - `README.md`: user-facing install + usage docs.
 - `package.json`: package metadata, bin mapping, publish file list.
 - `.gitignore`: ignore logs and generated runtime output.
@@ -56,7 +56,7 @@ Design intent:
 - `RALPH_AGENT_CMD` must be set or command exits with setup error.
 
 5. Completion semantics:
-- Loop exits early only when the last non-empty output line equals `RALPH_COMPLETION_PROMISE` (default `<promise>DONE</promise>`).
+- Loop exits early when the last non-empty output line matches `RALPH_COMPLETION_PROMISE` (default `<promise>DONE</promise>`), either as a literal match or when `parsed.result` trimmed end matches it for JSON output lines.
 
 6. `.ralph` scaffold contents:
 - `.ralph/env.sh`
@@ -64,21 +64,27 @@ Design intent:
 - `.ralph/OPERATOR_INSTRUCT.md`
 - `.ralph/prompts/build.md`
 - `.ralph/prompts/plan.md`
-- `.ralph/prompts/instruct.md`
+- `.ralph/prompts/sync.md`
 - `.ralph/specs/001-example-spec.md`
 
 7. Prompt templates:
-- Canonical prompt templates live in-repo under `prompts/build.md`, `prompts/plan.md`, and `prompts/instruct.md`.
-- `ralph init` scaffolds them to `.ralph/prompts/build.md`, `.ralph/prompts/plan.md`, and `.ralph/prompts/instruct.md`.
+- Canonical prompt templates live in-repo under `prompts/build.md`, `prompts/plan.md`, and `prompts/sync.md`.
+- `ralph init` scaffolds them to `.ralph/prompts/build.md`, `.ralph/prompts/plan.md`, and `.ralph/prompts/sync.md`.
 - Runtime loads prompts from `.ralph/prompts/*.md`, so users can customize prompts per project.
 
 8. CLI entry behavior:
 - `ralph` with no subcommand prints usage and exits.
-- Loop execution requires explicit `build`, `plan`, or `instruct` subcommands.
+- Loop execution requires explicit `build`, `plan`, or `sync` subcommands.
 
 9. Dry run behavior:
-- `--dry-run` is supported on `build`, `plan`, and `instruct`.
+- `--dry-run` is supported on `build`, `plan`, and `sync`.
 - Dry run prints resolved runtime context and exits without executing agent iterations.
+
+10. PID file behavior:
+- While an agent iteration is running, `.ralph/agent.pid` is written after spawning the child process.
+- Contents: `{ pid, mode, startedAt, logFile, note }` (JSON).
+- The `note` field contains the kill command to signal the entire process group.
+- The file is deleted (best-effort) when the iteration closes or errors.
 
 ## Code Change Guidelines
 
@@ -142,7 +148,7 @@ Expected files:
 - `.ralph/OPERATOR_INSTRUCT.md`
 - `.ralph/prompts/build.md`
 - `.ralph/prompts/plan.md`
-- `.ralph/prompts/instruct.md`
+- `.ralph/prompts/sync.md`
 - `.ralph/specs/001-example-spec.md`
 
 4. Loop smoke test with dummy completion agent:
@@ -162,7 +168,7 @@ Expected:
 
 ```bash
 node /absolute/path/to/ralph/bin/ralph.js build --dry-run
-node /absolute/path/to/ralph/bin/ralph.js instruct --dry-run
+node /absolute/path/to/ralph/bin/ralph.js sync --dry-run
 ```
 
 Expected:
@@ -190,7 +196,7 @@ When behavior changes, update `README.md` in the same change set.
 
 At minimum, docs must stay accurate for:
 - command usage,
-- explicit subcommand requirement (`build`/`plan`/`instruct`) and dry-run behavior,
+- explicit subcommand requirement (`build`/`plan`/`sync`) and dry-run behavior,
 - required env vars,
 - fixed `.ralph` path model,
 - completion semantics.

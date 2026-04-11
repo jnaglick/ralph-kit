@@ -28,7 +28,7 @@ This creates:
   prompts/
     build.md
     plan.md
-    instruct.md
+    sync.md
   specs/
     001-example-spec.md
 ```
@@ -40,7 +40,7 @@ This creates:
 source .ralph/env.sh
 ```
 2. Edit `.ralph/specs/*.md`.
-3. Optionally edit `.ralph/prompts/build.md`, `.ralph/prompts/plan.md`, and `.ralph/prompts/instruct.md` to customize agent behavior.
+3. Optionally edit `.ralph/prompts/build.md`, `.ralph/prompts/plan.md`, and `.ralph/prompts/sync.md` to customize agent behavior.
 4. Generate or refresh the plan:
 ```bash
 ralph plan
@@ -51,13 +51,13 @@ ralph build
 ```
 6. (Optionally) Refresh operator-facing required actions:
 ```bash
-ralph instruct
+ralph sync
 ```
 7. Preview runtime context without invoking the agent:
 ```bash
 ralph build --dry-run
 ralph plan --dry-run
-ralph instruct --dry-run
+ralph sync --dry-run
 ```
 
 ## Commands
@@ -68,17 +68,15 @@ Run these from your project root
 - `ralph`: print usage.
 - `ralph build [max-iterations]`: build mode.
 - `ralph plan [max-iterations]`: planning mode.
-- `ralph instruct [max-iterations]`: operator instruction refresh mode.
-- `ralph [build|plan|instruct] [max-iterations] --dry-run`: print resolved runtime context and exit without running iterations.
+- `ralph sync [max-iterations]`: reconciles the plan and operator instructions with actual project state.
+- `ralph [build|plan|sync] [max-iterations] --dry-run`: print resolved runtime context and exit without running iterations.
 
 ## Environment Variables
 
 - `RALPH_AGENT_CMD` (required): agent command that reads prompt text from stdin.
 - `RALPH_COMPLETION_PROMISE` (optional): defaults to `<promise>DONE</promise>`.
 
-Default `.ralph/env.sh` sets:
-
-- `RALPH_AGENT_CMD` to Claude print mode with `--permission-mode bypassPermissions` and `--add-dir "$PWD/.ralph"`.
+Default `.ralph/env.sh` sets `RALPH_AGENT_CMD` to use Claude.
 
 ## Operators Manual
 
@@ -109,7 +107,7 @@ The completion promise must not represent single-task completion. In build mode 
 
 ### Operator Instruction Semantics
 
-- `ralph instruct` analyzes specs, plan, codebase, and optionally logs to refresh `.ralph/OPERATOR_INSTRUCT.md`.
+- `ralph sync` reconciles the plan and operator instructions with actual project state.
 - `ralph plan` can reconcile operator-reported completed work from specs and refresh both `.ralph/IMPLEMENTATION_PLAN.md` and `.ralph/OPERATOR_INSTRUCT.md`.
 - `ralph build` also updates `.ralph/OPERATOR_INSTRUCT.md` with any human-required steps discovered during implementation.
 - When operator action is required, the agent should also add plan tasks that start with `**[Operator]**`.
@@ -122,6 +120,7 @@ The completion promise must not represent single-task completion. In build mode 
 
 ### Notes
 
-- Planning, build, and instruct logs are written to `ralph_<mode>_iter_<n>_<timestamp>.log`.
+- Planning, build, and sync logs are written to `.ralph/logs/<timestamp>_<mode>_<iteration>_.log`.
+- While an agent iteration is running, `.ralph/agent.pid` is written with JSON: `{ pid, mode, startedAt, logFile, note }`. It is removed when the iteration completes.
 - On process exit, the CLI does best-effort cleanup of the running agent process tree to avoid lingering child processes.
 - `--dry-run` validates setup and prints mode/config context, but does not execute any agent iterations.
