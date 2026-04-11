@@ -297,7 +297,7 @@ async function runLoop(mode, maxIterations, options = {}) {
 
     iteration += 1;
     const ts = timestampNow();
-    const logFile = path.join(logDir, `ralph_${mode}_iter_${iteration}_${ts}.log`);
+    const logFile = path.join(logDir, `${ts}_${mode}_${iteration}_.log`);
     const maxLabel = maxIterations > 0 ? `/${maxIterations}` : "";
     console.log(`\n~~~ Iteration ${iteration}${maxLabel} (${mode}) (${path.basename(logFile)}) ~~~`);
 
