@@ -204,6 +204,19 @@ function runAgentIteration({ agentCmd, runtimePrompt, workdir, logFile, env }) {
   });
 }
 
+function lineMatchesCompletionPromise(line, completionPromise) {
+  if (line === completionPromise) return true;
+  try {
+    const parsed = JSON.parse(line);
+    if (typeof parsed.result === "string" && parsed.result.trimEnd() === completionPromise) {
+      return true;
+    }
+  } catch {
+    // not JSON
+  }
+  return false;
+}
+
 async function runLoop(mode, maxIterations, options = {}) {
   const dryRun = Boolean(options.dryRun);
   const cwd = process.cwd();
@@ -286,8 +299,7 @@ async function runLoop(mode, maxIterations, options = {}) {
     const ts = timestampNow();
     const logFile = path.join(logDir, `ralph_${mode}_iter_${iteration}_${ts}.log`);
     const maxLabel = maxIterations > 0 ? `/${maxIterations}` : "";
-    console.log(`\n=== Iteration ${iteration}${maxLabel} (${mode}) ===`);
-    console.log(`Log file: ${logFile}`);
+    console.log(`\n~~~ Iteration ${iteration}${maxLabel} (${mode}) (${path.basename(logFile)}) ~~~`);
 
     const result = await runAgentIteration({
       agentCmd,
@@ -306,8 +318,8 @@ async function runLoop(mode, maxIterations, options = {}) {
       fail(`Agent command exited with code ${result.code}. See: ${logFile}`);
     }
 
-    if (result.lastNonEmptyLine === completionPromise) {
-      console.log(`Detected completion promise in iteration ${iteration}.`);
+    if (lineMatchesCompletionPromise(result.lastNonEmptyLine, completionPromise)) {
+      console.log(`\n💥 Detected completion promise in iteration ${iteration}.`);
       break;
     }
   }
