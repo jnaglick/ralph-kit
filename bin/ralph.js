@@ -86,7 +86,7 @@ function initCommand() {
   console.log(`Initialized ${configDir}`);
   console.log("Next steps:");
   console.log("1. source .ralph/env.sh");
-  console.log("2. Optionally edit .ralph/prompts/build.md, .ralph/prompts/plan.md, and .ralph/prompts/instruct.md");
+  console.log("2. Optionally edit .ralph/prompts/build.md, .ralph/prompts/plan.md, and .ralph/prompts/sync.md");
   console.log("3. Edit .ralph/specs/001-example-spec.md");
   console.log("4. Run: ralph plan");
   console.log("5. Review .ralph/IMPLEMENTATION_PLAN.md and .ralph/OPERATOR_INSTRUCT.md");
@@ -310,9 +310,9 @@ async function main() {
     return;
   }
 
-  if (args[0] === "instruct") {
+  if (args[0] === "sync") {
     const options = parseRunOptions(args.slice(1));
-    await runLoop("instruct", options.maxIterations, options);
+    await runLoop("sync", options.maxIterations, options);
     return;
   }
 
