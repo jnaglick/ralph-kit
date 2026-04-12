@@ -62,6 +62,7 @@ Design intent:
 - `.ralph/env.sh`
 - `.ralph/IMPLEMENTATION_PLAN.md`
 - `.ralph/OPERATOR_INSTRUCT.md`
+- `.ralph/AGENT_SCRATCHPAD.md`
 - `.ralph/prompts/build.md`
 - `.ralph/prompts/plan.md`
 - `.ralph/prompts/sync.md`
@@ -146,6 +147,7 @@ Expected files:
 - `.ralph/env.sh`
 - `.ralph/IMPLEMENTATION_PLAN.md`
 - `.ralph/OPERATOR_INSTRUCT.md`
+- `.ralph/AGENT_SCRATCHPAD.md`
 - `.ralph/prompts/build.md`
 - `.ralph/prompts/plan.md`
 - `.ralph/prompts/sync.md`
@@ -199,6 +201,7 @@ At minimum, docs must stay accurate for:
 - explicit subcommand requirement (`build`/`plan`/`sync`) and dry-run behavior,
 - required env vars,
 - fixed `.ralph` path model,
+- plan/operator/scratchpad semantics,
 - completion semantics.
 
 ## Common Failure Modes

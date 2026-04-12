@@ -5,12 +5,13 @@
 - Specs: `{{SPECS_GLOB}}`
 - Implementation plan: `{{PLAN_FILE}}`
 - Operator instructions file: `{{OPERATOR_INSTRUCT_FILE}}`
+- Agent scratchpad file: `{{SCRATCHPAD_FILE}}`
 - Logs directory: `{{LOG_DIR}}`
 - Target repository: `{{WORKDIR}}`
 
 ## Objective
 
-Reconcile `{{PLAN_FILE}}` and `{{OPERATOR_INSTRUCT_FILE}}` with actual project state so they accurately reflect where things stand. This is a read-heavy, write-minimal operation. Do not touch code.
+Reconcile `{{PLAN_FILE}}`, `{{OPERATOR_INSTRUCT_FILE}}`, and `{{SCRATCHPAD_FILE}}` with actual project state so they accurately reflect where things stand. This is a read-heavy, write-minimal operation. Do not touch code.
 
 ## When to run
 
@@ -18,13 +19,14 @@ Use `ralph sync` when there may be drift between the plan/instructions and reali
 
 ## Analysis Steps
 
-1. Read the specs (`{{SPECS_GLOB}}`), `{{PLAN_FILE}}`, and `{{OPERATOR_INSTRUCT_FILE}}`.
+1. Read the specs (`{{SPECS_GLOB}}`), `{{PLAN_FILE}}`, `{{OPERATOR_INSTRUCT_FILE}}`, and `{{SCRATCHPAD_FILE}}`.
 2. Review recent logs in `{{LOG_DIR}}` to understand what was last attempted and whether it completed.
 3. Inspect the repository state (code, config, test results, etc.) only as needed to verify what is actually done vs. what the plan claims.
+4. For each scratchpad note, decide whether it still helps with remaining unchecked tasks.
 
 ## Output Rules
 
-**You may only write to `{{PLAN_FILE}}` and `{{OPERATOR_INSTRUCT_FILE}}`. Do not modify any code or other files.**
+**You may only write to `{{PLAN_FILE}}`, `{{OPERATOR_INSTRUCT_FILE}}`, and `{{SCRATCHPAD_FILE}}`. Do not modify any code or other files.**
 
 Apply the minimal changes necessary to make the plan and operator instructions accurate:
 
@@ -36,7 +38,14 @@ Apply the minimal changes necessary to make the plan and operator instructions a
 
 Update `{{OPERATOR_INSTRUCT_FILE}}` only if the current operator instructions are stale, incorrect, or missing something critical. Remove items that are no longer needed; add items only if a concrete operator action is genuinely required before the next build.
 
-If `{{PLAN_FILE}}` and `{{OPERATOR_INSTRUCT_FILE}}` are already accurate, make no changes.
+Update `{{SCRATCHPAD_FILE}}` as a cleanup pass:
+
+- Remove notes tied only to completed or removed tasks that no longer provide value.
+- Keep notes that remain useful for unchecked tasks or stable repository constraints.
+- Correct notes that conflict with current codebase reality.
+- Consolidate duplicates so future iterations can scan quickly.
+
+If `{{PLAN_FILE}}`, `{{OPERATOR_INSTRUCT_FILE}}`, and `{{SCRATCHPAD_FILE}}` are already accurate, make no changes.
 
 ## Completion
 

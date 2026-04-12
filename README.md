@@ -25,6 +25,7 @@ This creates:
   env.sh
   IMPLEMENTATION_PLAN.md
   OPERATOR_INSTRUCT.md
+  AGENT_SCRATCHPAD.md
   prompts/
     build.md
     plan.md
@@ -68,7 +69,7 @@ Run these from your project root
 - `ralph`: print usage.
 - `ralph build [max-iterations]`: build mode.
 - `ralph plan [max-iterations]`: planning mode.
-- `ralph sync [max-iterations]`: reconciles the plan and operator instructions with actual project state.
+- `ralph sync [max-iterations]`: reconciles the plan, operator instructions, and scratchpad with actual project state.
 - `ralph [build|plan|sync] [max-iterations] --dry-run`: print resolved runtime context and exit without running iterations.
 
 ## Environment Variables
@@ -107,15 +108,22 @@ The completion promise must not represent single-task completion. In build mode 
 
 ### Operator Instruction Semantics
 
-- `ralph sync` reconciles the plan and operator instructions with actual project state.
-- `ralph plan` can reconcile operator-reported completed work from specs and refresh both `.ralph/IMPLEMENTATION_PLAN.md` and `.ralph/OPERATOR_INSTRUCT.md`.
-- `ralph build` also updates `.ralph/OPERATOR_INSTRUCT.md` with any human-required steps discovered during implementation.
+- `ralph sync` reconciles the plan, operator instructions, and scratchpad with actual project state.
+- `ralph plan` can reconcile operator-reported completed work from specs and refresh `.ralph/IMPLEMENTATION_PLAN.md`, `.ralph/OPERATOR_INSTRUCT.md`, and `.ralph/AGENT_SCRATCHPAD.md`.
+- `ralph build` also updates `.ralph/OPERATOR_INSTRUCT.md` and `.ralph/AGENT_SCRATCHPAD.md` with any human-required steps and reusable future-iteration context discovered during implementation.
 - When operator action is required, the agent should also add plan tasks that start with `**[Operator]**`.
 - The operator should mark those `**[Operator]**` tasks as `[x]` after completing them.
 - The agent should add agent-owned follow-up verification tasks immediately below operator tasks to validate operator work.
 - Operator instructions should include the acceptance criteria/checks that will be run after operator completion.
 - In build mode, if only operator tasks (and agent verification tasks blocked on them) remain, the agent should print the completion promise to hand control back to the operator instead of looping.
 - If no operator action is required, `.ralph/OPERATOR_INSTRUCT.md` should explicitly say so.
+
+### Agent Scratchpad Semantics
+
+- `.ralph/AGENT_SCRATCHPAD.md` is persistent memory for future agent iterations.
+- `ralph plan` should note context that upcoming unchecked tasks are likely to need.
+- `ralph build` should read and update the scratchpad with reusable findings (paths, constraints, commands, pitfalls) discovered during implementation.
+- `ralph sync` should remove stale scratchpad notes tied to completed/removed work and keep notes useful for remaining unchecked tasks.
 
 
 ### Notes

@@ -13,6 +13,7 @@ import {
   DEFAULT_COMPLETION_PROMISE,
   DEFAULT_ENV_SH,
   DEFAULT_FIRST_SPEC,
+  DEFAULT_AGENT_SCRATCHPAD,
   DEFAULT_OPERATOR_INSTRUCT,
   DEFAULT_PLAN,
   HELP_TEXT
@@ -81,6 +82,7 @@ function initCommand() {
   fs.chmodSync(path.join(configDir, "env.sh"), 0o755);
   fs.writeFileSync(path.join(configDir, "IMPLEMENTATION_PLAN.md"), DEFAULT_PLAN, "utf8");
   fs.writeFileSync(path.join(configDir, "OPERATOR_INSTRUCT.md"), DEFAULT_OPERATOR_INSTRUCT, "utf8");
+  fs.writeFileSync(path.join(configDir, "AGENT_SCRATCHPAD.md"), DEFAULT_AGENT_SCRATCHPAD, "utf8");
   fs.writeFileSync(path.join(configDir, "specs", "001-example-spec.md"), DEFAULT_FIRST_SPEC, "utf8");
 
   console.log(`Initialized ${configDir}`);
@@ -89,7 +91,7 @@ function initCommand() {
   console.log("2. Optionally edit .ralph/prompts/build.md, .ralph/prompts/plan.md, and .ralph/prompts/sync.md");
   console.log("3. Edit .ralph/specs/001-example-spec.md");
   console.log("4. Run: ralph plan");
-  console.log("5. Review .ralph/IMPLEMENTATION_PLAN.md and .ralph/OPERATOR_INSTRUCT.md");
+  console.log("5. Review .ralph/IMPLEMENTATION_PLAN.md, .ralph/OPERATOR_INSTRUCT.md, and .ralph/AGENT_SCRATCHPAD.md");
   console.log("6. Run: ralph build");
 }
 
@@ -242,7 +244,7 @@ async function runLoop(mode, maxIterations, options = {}) {
   const agentCmd = process.env.RALPH_AGENT_CMD;
 
   if (!agentCmd || agentCmd.trim() === "") {
-    fail("Setup error: RALPH_AGENT_CMD is not set. Export it before running this command.");
+    fail("Setup error: RALPH_AGENT_CMD is not set. Export it before running this command. (Hint: `source .ralph/env.sh`)");
   }
 
   ensureDirectory(configDir, "CONFIG_DIR");
@@ -252,12 +254,18 @@ async function runLoop(mode, maxIterations, options = {}) {
   const specsGlob = path.join(specsDir, "*.md");
   const planFile = path.join(configDir, "IMPLEMENTATION_PLAN.md");
   const operatorInstructFile = path.join(configDir, "OPERATOR_INSTRUCT.md");
+  const scratchpadFile = path.join(configDir, "AGENT_SCRATCHPAD.md");
   ensureDirectory(specsDir, "Specs directory");
   ensureFile(planFile, "Implementation plan");
   if (!fs.existsSync(operatorInstructFile)) {
     fs.writeFileSync(operatorInstructFile, DEFAULT_OPERATOR_INSTRUCT, "utf8");
   } else {
     ensureFile(operatorInstructFile, "Operator instructions");
+  }
+  if (!fs.existsSync(scratchpadFile)) {
+    fs.writeFileSync(scratchpadFile, DEFAULT_AGENT_SCRATCHPAD, "utf8");
+  } else {
+    ensureFile(scratchpadFile, "Agent scratchpad");
   }
   scaffoldProjectPrompts(configDir);
 
@@ -270,6 +278,7 @@ async function runLoop(mode, maxIterations, options = {}) {
     planFile,
     completionPromise,
     operatorInstructFile,
+    scratchpadFile,
     logDir
   };
   const modePromptPath = projectPromptPath(configDir, mode);
@@ -282,6 +291,8 @@ async function runLoop(mode, maxIterations, options = {}) {
   console.log(`Log dir: ${logDir}`);
   console.log(`Prompt file: ${modePromptPath}`);
   console.log(`Operator instructions file: ${operatorInstructFile}`);
+  console.log(`Agent scratchpad file: ${scratchpadFile}`);
+
   if (maxIterations > 0) {
     console.log(`Max iterations: ${maxIterations}`);
   } else {
@@ -326,6 +337,7 @@ async function runLoop(mode, maxIterations, options = {}) {
       pidFile: path.join(configDir, "agent.pid"),
       env: childEnv
     });
+
     const durationSeconds = (result.durationMs / 1000).toFixed(1);
     console.log(`\nIteration ${iteration} completed in ${durationSeconds}s.`);
 

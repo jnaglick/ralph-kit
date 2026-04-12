@@ -6,10 +6,12 @@
 - Current codebase: `{{WORKDIR}}`
 - Plan output file: `{{PLAN_FILE}}`
 - Operator instructions file: `{{OPERATOR_INSTRUCT_FILE}}`
+- Agent scratchpad file: `{{SCRATCHPAD_FILE}}`
 
 ## Objective
 
 Compare specs to the current codebase and create or refresh `{{PLAN_FILE}}`.
+Refresh `{{OPERATOR_INSTRUCT_FILE}}` and `{{SCRATCHPAD_FILE}}` so future build iterations have accurate handoff details and reusable implementation context.
 When specs include operator notes about completed external work, reconcile plan state and operator guidance accordingly.
 
 ## Rules
@@ -28,4 +30,6 @@ When specs include operator notes about completed external work, reconcile plan 
 12. Immediately below each `**[Operator]**` task, add one or more agent-owned follow-up tasks to verify the operator step was done correctly.
 13. Structure operator-related plan items so that, while waiting on operator work, remaining tasks are only `**[Operator]**` tasks plus verification tasks blocked on them.
 14. If no human action is required, state that explicitly in `{{OPERATOR_INSTRUCT_FILE}}` and remove stale `**[Operator]**` tasks.
-15. Print `{{COMPLETION_PROMISE}}` as the final non-empty line after planning updates are complete.
+15. Use `{{SCRATCHPAD_FILE}}` to capture durable facts future build iterations are likely to need (key file locations, integration constraints, reusable commands, and known pitfalls for still-unchecked tasks).
+16. Keep scratchpad notes concise and factual; remove or rewrite stale notes that no longer match current plan/spec reality.
+17. Print `{{COMPLETION_PROMISE}}` as the final non-empty line after planning updates are complete.
